@@ -29,7 +29,7 @@ input_boolean:
     name: "Attivazione Riscaldamento Automatico"
     icon: mdi:fire
   
-  presenza_piero:
+  presenza_ospiti:
     name: "Presenza Ospiti Camera FG"
     icon: mdi:account-check
 
@@ -72,7 +72,7 @@ input_text:
 ### Climatizzatori
 Associa i tuoi climatizzatori per ogni zona:
 - Zone Giorno: Cucina, Sala, Soggiorno, Studio
-- Zone Notte: Matrimoniale, Demetrio, Camera Ospiti/FG
+- Zone Notte: Matrimoniale, Camera Secondaria, Camera Ospiti/FG
 - Zone Ospiti: B&B
 
 ### Soglie Operative (valori consigliati)
@@ -109,7 +109,7 @@ Associa i tuoi climatizzatori per ogni zona:
 | Soggiorno | ✅ | ✅ | ✅ | Comfort |
 | Studio | ✅ | ❌ | ❌ | Comfort |
 | Matrimoniale | ✅ | ✅ | ✅ | Eco |
-| Demetrio | ✅ | ✅ | ✅ | Eco |
+| Camera Secondaria | ✅ | ✅ | ✅ | Eco |
 | Camera FG | ✅* | ✅* | ❌ | Ospiti |
 | B&B | ✅ | ❌ | ❌ | Comfort |
 

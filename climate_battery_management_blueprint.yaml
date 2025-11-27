@@ -20,7 +20,7 @@ blueprint:
     6. **Temperatura esterna alta** (> 22°C): Spegnimento totale
     
   domain: automation
-  source_url: https://github.com/your-repo/climate-battery-management
+  source_url: https://github.com/francosax/ha-climate-battery-management/blob/main/climate_battery_management_blueprint.yaml
   
   input:
     # ============================================================================
@@ -111,8 +111,8 @@ blueprint:
           domain: climate
     
     climate_demetrio:
-      name: Climatizzatore Camera Demetrio
-      description: Climatizzatore camera Demetrio (zona base notte)
+      name: Climatizzatore Camera Secondaria
+      description: Climatizzatore camera secondaria/figli (zona base notte)
       selector:
         entity:
           domain: climate
@@ -168,7 +168,7 @@ blueprint:
     
     eco_temperature:
       name: Temperatura Eco Zone Notte
-      description: Temperatura minima per zone notte (matrimoniale/demetrio)
+      description: Temperatura minima per zone notte (matrimoniale/camera secondaria)
       default: 19
       selector:
         number:
@@ -778,7 +778,7 @@ action:
                   value: >
                     🟡 SOLO ZONE PRIORITARIE BASE - {{ now().strftime('%d/%m %H:%M') }} 
                     SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W
-                    Zone: Cucina/Sala/Soggiorno/Matrimoniale/Demetrio | Altri: SPENTI
+                    Zone: Cucina/Sala/Soggiorno/Matrimoniale/Camera Secondaria | Altri: SPENTI
           
           - if:
               - condition: template

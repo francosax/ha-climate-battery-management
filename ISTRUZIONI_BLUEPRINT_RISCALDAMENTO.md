@@ -53,7 +53,7 @@ input_boolean:
     name: "Attivazione Riscaldamento Automatico"
     icon: mdi:fire
   
-  presenza_piero:
+  presenza_ospiti:
     name: "Presenza Ospiti Camera FG"
     icon: mdi:account-check
 ```
@@ -152,7 +152,7 @@ Seleziona i tuoi climatizzatori per ogni zona:
 
 #### Zone Notte (priorità MEDIA)
 - **Camera Matrimoniale**: `climate.a_c_camera_matrimoniale`
-- **Camera Demetrio**: `climate.a_c_demetrio`
+- **Camera Secondaria/Figli**: `climate.a_c_camera_secondaria`
 - **Camera Ospiti/FG**: `climate.a_c_camera_figli_grandi` (condizionato a presenza)
 
 #### Zone Ospiti (priorità BASSA)
@@ -162,7 +162,7 @@ Seleziona i tuoi climatizzatori per ogni zona:
 | Parametro | Descrizione | Esempio |
 |-----------|-------------|---------|
 | **Interruttore Abilitazione** | On/Off automazione | `input_boolean.attivazione_riscaldamento` |
-| **Presenza Ospiti Camera FG** | Attiva/disattiva camera ospiti | `input_boolean.presenza_piero` |
+| **Presenza Ospiti Camera FG** | Attiva/disattiva camera ospiti | `input_boolean.presenza_ospiti` |
 
 ### Passo 6: Imposta le temperature
 Puoi usare i valori di default del blueprint oppure collegare input_number:
@@ -170,7 +170,7 @@ Puoi usare i valori di default del blueprint oppure collegare input_number:
 | Parametro | Default | Range | Descrizione |
 |-----------|---------|-------|-------------|
 | **Comfort Zone Giorno** | 22°C | 18-26°C | Cucina, sala, soggiorno |
-| **Eco Zone Notte** | 19°C | 16-22°C | Camere matrimoniale e Demetrio |
+| **Eco Zone Notte** | 19°C | 16-22°C | Camere matrimoniale e secondaria |
 | **Camera Ospiti/Studio** | 19°C | 16-24°C | Camera FG quando presente |
 
 ### Passo 7: Configura le soglie operative
@@ -220,21 +220,21 @@ Puoi usare i valori di default del blueprint oppure collegare input_number:
          ├─► 3. LIVELLO MAX? (SOC > 90% O Surplus > 4000W) E Temp < 20°C
          │   └─► SÌ → ATTIVA TUTTE LE ZONE 🔥
          │       ├─ Giorno (22°C): Cucina, Sala, Soggiorno, Studio
-         │       ├─ Notte (19°C): Matrimoniale, Demetrio
+         │       ├─ Notte (19°C): Matrimoniale, Camera Secondaria
          │       ├─ Ospiti (19°C): Camera FG (se presente)
          │       └─ B&B (22°C)
          │
          ├─► 4. LIVELLO MEDIO? (70% < SOC < 90% O 2000W < Surplus < 4000W)
          │   └─► SÌ → ATTIVA ZONE PRIORITARIE + CAMERA FG ⚡
          │       ├─ Giorno (22°C): Cucina, Sala, Soggiorno
-         │       ├─ Notte (19°C): Matrimoniale, Demetrio
+         │       ├─ Notte (19°C): Matrimoniale, Camera Secondaria
          │       ├─ Ospiti (19°C): Camera FG (se presente)
          │       └─ SPENTI: Studio, B&B
          │
          ├─► 5. LIVELLO BASE? (50% < SOC < 70% E Surplus < 2000W)
          │   └─► SÌ → SOLO ZONE ESSENZIALI 🟡
          │       ├─ Giorno (22°C): Cucina, Sala, Soggiorno
-         │       ├─ Notte (19°C): Matrimoniale, Demetrio
+         │       ├─ Notte (19°C): Matrimoniale, Camera Secondaria
          │       └─ SPENTI: Studio, Camera FG, B&B
          │
          ├─► 6. BATTERIA CRITICA? (SOC < 50%)
@@ -615,7 +615,7 @@ automation:
 
 1. **Input boolean presenza attivo**:
    ```yaml
-   input_boolean.presenza_piero: "on"
+   input_boolean.presenza_ospiti: "on"
    ```
 
 2. **Livello operativo raggiunto**:
