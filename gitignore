@@ -1,0 +1,34 @@
+# Home Assistant
+*.log
+*.db
+*.db-shm
+*.db-wal
+home-assistant.log
+home-assistant_v2.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+
+# Test
+test_*.yaml
+tmp/
+temp/

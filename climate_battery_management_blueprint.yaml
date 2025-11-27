@@ -1,0 +1,857 @@
+blueprint:
+  name: Gestione Climatizzatori con Batteria e Surplus Solare
+  description: |
+    Automazione avanzata per gestire i climatizzatori in base allo stato di carica (SOC) 
+    della batteria e al surplus di produzione solare, con logica a gradini di priorità.
+    
+    **Funzionalità principali:**
+    - 6 livelli di gestione automatica basati su SOC e surplus solare
+    - Gestione di 8 zone climatiche indipendenti
+    - Controllo presenza per zone opzionali
+    - Protezione batteria con cambio automatico a rete
+    - Notifiche dettagliate per ogni cambio di stato
+    
+    **Logica di funzionamento:**
+    1. **Livello MAX** (SOC > 90% O Surplus > 4000W): Tutte le zone attive
+    2. **Livello MEDIO** (70% < SOC < 90% O Surplus 2000-4000W): Zone prioritarie + Camera ospiti
+    3. **Livello BASE** (50% < SOC < 70%): Solo zone essenziali (giorno + notte base)
+    4. **Protezione batteria** (SOC < 50%): Spegnimento totale e passaggio a rete
+    5. **Comfort raggiunto**: Spegnimento automatico quando temperatura target superata
+    6. **Temperatura esterna alta** (> 22°C): Spegnimento totale
+    
+  domain: automation
+  source_url: https://github.com/your-repo/climate-battery-management
+  
+  input:
+    # ============================================================================
+    # SENSORI ENERGIA E PRODUZIONE
+    # ============================================================================
+    battery_sensor:
+      name: Sensore Stato Carica Batteria (SOC)
+      description: Sensore che indica la percentuale di carica della batteria (0-100%)
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+    
+    solar_production_sensor:
+      name: Sensore Produzione Solare Attuale
+      description: Sensore che indica la produzione solare istantanea in Watt
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    
+    load_power_sensor:
+      name: Sensore Carico Attuale
+      description: Sensore che indica il consumo elettrico totale della casa in Watt
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    
+    # ============================================================================
+    # SENSORI TEMPERATURA
+    # ============================================================================
+    outdoor_temp_sensor:
+      name: Sensore Temperatura Esterna
+      description: Sensore temperatura esterna per decidere quando attivare il riscaldamento
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    
+    reference_indoor_temp_sensor:
+      name: Sensore Temperatura Interna di Riferimento
+      description: Sensore temperatura della zona principale (es. sala) per controllo comfort
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    
+    # ============================================================================
+    # CLIMATIZZATORI - ZONA GIORNO
+    # ============================================================================
+    climate_cucina:
+      name: Climatizzatore Cucina
+      description: Climatizzatore della cucina (zona prioritaria)
+      selector:
+        entity:
+          domain: climate
+    
+    climate_sala:
+      name: Climatizzatore Sala
+      description: Climatizzatore della sala (zona prioritaria)
+      selector:
+        entity:
+          domain: climate
+    
+    climate_soggiorno:
+      name: Climatizzatore Soggiorno
+      description: Climatizzatore del soggiorno (zona prioritaria)
+      selector:
+        entity:
+          domain: climate
+    
+    climate_studio:
+      name: Climatizzatore Studio
+      description: Climatizzatore dello studio (attivo solo a livello MAX)
+      selector:
+        entity:
+          domain: climate
+    
+    # ============================================================================
+    # CLIMATIZZATORI - ZONA NOTTE
+    # ============================================================================
+    climate_matrimoniale:
+      name: Climatizzatore Camera Matrimoniale
+      description: Climatizzatore camera matrimoniale (zona base notte)
+      selector:
+        entity:
+          domain: climate
+    
+    climate_demetrio:
+      name: Climatizzatore Camera Demetrio
+      description: Climatizzatore camera Demetrio (zona base notte)
+      selector:
+        entity:
+          domain: climate
+    
+    climate_camera_fg:
+      name: Climatizzatore Camera Figli Grandi / Ospiti
+      description: Climatizzatore camera ospiti (condizionato a presenza)
+      selector:
+        entity:
+          domain: climate
+    
+    # ============================================================================
+    # CLIMATIZZATORI - ZONA B&B/OSPITI
+    # ============================================================================
+    climate_bnb:
+      name: Climatizzatore B&B
+      description: Climatizzatore zona B&B (attivo solo a livello MAX)
+      selector:
+        entity:
+          domain: climate
+    
+    # ============================================================================
+    # CONTROLLI E INPUT
+    # ============================================================================
+    enable_heating_switch:
+      name: Interruttore Abilitazione Riscaldamento
+      description: Input boolean per abilitare/disabilitare l'automazione
+      selector:
+        entity:
+          domain: input_boolean
+    
+    guest_presence_switch:
+      name: Interruttore Presenza Ospiti (Camera FG)
+      description: Input boolean che indica se ci sono ospiti nella camera FG
+      selector:
+        entity:
+          domain: input_boolean
+    
+    # ============================================================================
+    # SETPOINT TEMPERATURA
+    # ============================================================================
+    comfort_temperature:
+      name: Temperatura Comfort Zone Giorno
+      description: Temperatura desiderata per zone giorno (cucina/sala/soggiorno)
+      default: 22
+      selector:
+        number:
+          min: 18
+          max: 26
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: slider
+    
+    eco_temperature:
+      name: Temperatura Eco Zone Notte
+      description: Temperatura minima per zone notte (matrimoniale/demetrio)
+      default: 19
+      selector:
+        number:
+          min: 16
+          max: 22
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: slider
+    
+    guest_temperature:
+      name: Temperatura Camera Ospiti/Studio
+      description: Temperatura per camera ospiti e studio
+      default: 19
+      selector:
+        number:
+          min: 16
+          max: 24
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: slider
+    
+    # ============================================================================
+    # SOGLIE OPERATIVE
+    # ============================================================================
+    battery_high_threshold:
+      name: Soglia Batteria Alta (Livello MAX)
+      description: Percentuale SOC sopra la quale si attiva il livello MAX
+      default: 90
+      selector:
+        number:
+          min: 70
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+    
+    battery_medium_threshold:
+      name: Soglia Batteria Media (Livello MEDIO)
+      description: Percentuale SOC sopra la quale si attiva il livello MEDIO
+      default: 70
+      selector:
+        number:
+          min: 50
+          max: 90
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+    
+    battery_low_threshold:
+      name: Soglia SOC Minima (Protezione Batteria / Passaggio Rete)
+      description: |
+        Percentuale SOC sotto la quale l'automazione spegne TUTTO e passa il controllo 
+        all'automazione di rete/generatore. Protegge la batteria da scariche profonde.
+      default: 50
+      selector:
+        number:
+          min: 30
+          max: 70
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+    
+    surplus_high_threshold:
+      name: Soglia Surplus Alto (Livello MAX)
+      description: Potenza surplus (W) sopra la quale si attiva livello MAX
+      default: 4000
+      selector:
+        number:
+          min: 2000
+          max: 8000
+          step: 500
+          unit_of_measurement: "W"
+          mode: box
+    
+    surplus_medium_threshold:
+      name: Soglia Surplus Medio (Livello MEDIO)
+      description: Potenza surplus (W) sopra la quale si attiva livello MEDIO
+      default: 2000
+      selector:
+        number:
+          min: 1000
+          max: 4000
+          step: 500
+          unit_of_measurement: "W"
+          mode: box
+    
+    outdoor_temp_low:
+      name: Temperatura Esterna Minima per Attivazione
+      description: Sotto questa temperatura si attiva il riscaldamento
+      default: 20
+      selector:
+        number:
+          min: 10
+          max: 25
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: slider
+    
+    outdoor_temp_high:
+      name: Temperatura Esterna Massima per Spegnimento
+      description: Sopra questa temperatura si spegne tutto il riscaldamento
+      default: 22
+      selector:
+        number:
+          min: 15
+          max: 30
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: slider
+    
+    comfort_hysteresis:
+      name: Isteresi Temperatura Comfort
+      description: Gradi sopra la temperatura target per spegnere (comfort raggiunto)
+      default: 0.5
+      selector:
+        number:
+          min: 0.3
+          max: 2.0
+          step: 0.1
+          unit_of_measurement: "°C"
+          mode: slider
+    
+    # ============================================================================
+    # NOTIFICHE (OPZIONALE)
+    # ============================================================================
+    notification_service:
+      name: Servizio di Notifica (Opzionale)
+      description: Servizio per ricevere notifiche sui cambi di stato (es. mobile_app_smartphone)
+      default: ""
+      selector:
+        text:
+    
+    notification_text_entity:
+      name: Entity per Ultima Notifica (Opzionale)
+      description: Input text per salvare l'ultima notifica inviata
+      default: ""
+      selector:
+        entity:
+          domain: input_text
+
+# ==============================================================================
+# TRIGGER
+# ==============================================================================
+trigger:
+  # Batteria sopra soglia media
+  - entity_id: !input battery_sensor
+    above: !input battery_medium_threshold
+    id: battery_medium
+    platform: numeric_state
+  
+  # Batteria sopra soglia alta
+  - entity_id: !input battery_sensor
+    above: !input battery_high_threshold
+    id: battery_high
+    platform: numeric_state
+  
+  # Temperatura esterna bassa
+  - entity_id: !input outdoor_temp_sensor
+    below: !input outdoor_temp_low
+    for:
+      minutes: 15
+    id: temp_low
+    platform: numeric_state
+  
+  # Temperatura esterna alta
+  - entity_id: !input outdoor_temp_sensor
+    above: !input outdoor_temp_high
+    for:
+      minutes: 10
+    id: temp_high
+    platform: numeric_state
+  
+  # Batteria sotto soglia media
+  - entity_id: !input battery_sensor
+    below: !input battery_medium_threshold
+    id: battery_medium_low
+    platform: numeric_state
+  
+  # Batteria sotto soglia bassa
+  - entity_id: !input battery_sensor
+    below: !input battery_low_threshold
+    id: battery_low
+    platform: numeric_state
+  
+  # Surplus solare disponibile
+  - platform: template
+    value_template: >
+      {{ (states(!input solar_production_sensor) | float(0) - 
+          states(!input load_power_sensor) | float(0)) > !input surplus_medium_threshold }}
+    for:
+      minutes: 10
+    id: solar_surplus
+  
+  # Attivazione manuale
+  - entity_id: !input enable_heating_switch
+    to: "on"
+    id: manual_on
+    platform: state
+  
+  # Comfort raggiunto
+  - platform: template
+    value_template: >
+      {% set target_temp = !input comfort_temperature %}
+      {% set current_temp = states(!input reference_indoor_temp_sensor) | float(0) %}
+      {% set hysteresis = !input comfort_hysteresis %}
+      {{ current_temp >= (target_temp + hysteresis) }}
+    for:
+      minutes: 10
+    id: temp_comfort_reached
+
+# ==============================================================================
+# CONDITION
+# ==============================================================================
+condition:
+  - condition: state
+    entity_id: !input enable_heating_switch
+    state: "on"
+
+# ==============================================================================
+# ACTION
+# ==============================================================================
+action:
+  - variables:
+      surplus_power: >
+        {{ (states(!input solar_production_sensor) | float(0) - 
+            states(!input load_power_sensor) | float(0)) }}
+      battery_level: "{{ states(!input battery_sensor) | float(0) }}"
+      comfort_temp: !input comfort_temperature
+      eco_temp: !input eco_temperature
+      guest_temp: !input guest_temperature
+      battery_high: !input battery_high_threshold
+      battery_medium: !input battery_medium_threshold
+      battery_low: !input battery_low_threshold
+      surplus_high: !input surplus_high_threshold
+      surplus_medium: !input surplus_medium_threshold
+      outdoor_low: !input outdoor_temp_low
+      notification_enabled: "{{ !input notification_service != '' }}"
+      text_entity_enabled: "{{ !input notification_text_entity != '' }}"
+  
+  - choose:
+      # ========================================================================
+      # 1. SPEGNIMENTO - Comfort Raggiunto
+      # ========================================================================
+      - conditions:
+          - condition: trigger
+            id: temp_comfort_reached
+        sequence:
+          - service: climate.turn_off
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+                - !input climate_studio
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+                - !input climate_camera_fg
+                - !input climate_bnb
+          
+          - if:
+              - condition: template
+                value_template: "{{ text_entity_enabled }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input notification_text_entity
+                data:
+                  value: >
+                    🥶 Climatizzatori Spenti (Comfort Raggiunto) - Sala > {{ comfort_temp }}°C
+          
+          - if:
+              - condition: template
+                value_template: "{{ notification_enabled }}"
+            then:
+              - service: !input notification_service
+                data:
+                  message: >
+                    🥶 Climatizzatori Spenti (Comfort Raggiunto) - Sala > {{ comfort_temp }}°C
+
+      # ========================================================================
+      # 2. SPEGNIMENTO - Temperatura Esterna Alta
+      # ========================================================================
+      - conditions:
+          - condition: trigger
+            id: temp_high
+        sequence:
+          - service: climate.turn_off
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+                - !input climate_studio
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+                - !input climate_camera_fg
+                - !input climate_bnb
+          
+          - if:
+              - condition: template
+                value_template: "{{ text_entity_enabled }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input notification_text_entity
+                data:
+                  value: >
+                    🌡️ Tutti i climatizzatori spenti - Temperatura esterna > {{ outdoor_low }}°C 
+                    ({{ states(!input outdoor_temp_sensor) }}°C)
+          
+          - if:
+              - condition: template
+                value_template: "{{ notification_enabled }}"
+            then:
+              - service: !input notification_service
+                data:
+                  message: >
+                    🌡️ Tutti i climatizzatori spenti - Temperatura esterna > {{ outdoor_low }}°C 
+                    ({{ states(!input outdoor_temp_sensor) }}°C)
+
+      # ========================================================================
+      # 3. ATTIVAZIONE - Livello MAX (Batteria > 90% O Surplus > 4000W)
+      # ========================================================================
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: numeric_state
+                entity_id: !input battery_sensor
+                above: !input battery_high_threshold
+              - condition: template
+                value_template: "{{ surplus_power > surplus_high }}"
+          - condition: numeric_state
+            entity_id: !input outdoor_temp_sensor
+            below: !input outdoor_temp_low
+        sequence:
+          # Zona Giorno + Studio
+          - service: climate.set_hvac_mode
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+                - !input climate_studio
+            data:
+              hvac_mode: heat
+          
+          - service: climate.set_temperature
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+                - !input climate_studio
+            data:
+              temperature: "{{ comfort_temp }}"
+          
+          # Zona Notte
+          - service: climate.set_hvac_mode
+            target:
+              entity_id:
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+            data:
+              hvac_mode: heat
+          
+          - service: climate.set_temperature
+            target:
+              entity_id:
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+            data:
+              temperature: "{{ eco_temp }}"
+          
+          # Camera FG condizionata alla presenza
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input guest_presence_switch
+                    state: "on"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target:
+                      entity_id: !input climate_camera_fg
+                    data:
+                      hvac_mode: heat
+                  - service: climate.set_temperature
+                    target:
+                      entity_id: !input climate_camera_fg
+                    data:
+                      temperature: "{{ guest_temp }}"
+            default:
+              - service: climate.turn_off
+                target:
+                  entity_id: !input climate_camera_fg
+          
+          # B&B
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: !input climate_bnb
+            data:
+              hvac_mode: heat
+          
+          - service: climate.set_temperature
+            target:
+              entity_id: !input climate_bnb
+            data:
+              temperature: "{{ comfort_temp }}"
+          
+          # Notifiche
+          - if:
+              - condition: template
+                value_template: "{{ text_entity_enabled }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input notification_text_entity
+                data:
+                  value: >
+                    🔥 TUTTE LE ZONE ATTIVE - {{ now().strftime('%d/%m %H:%M') }} 
+                    SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W 
+                    Zone giorno: {{ comfort_temp }}°C | Zone notte: {{ eco_temp }}°C 
+                    Camera FG/Studio: {{ guest_temp }}°C | B&B: {{ comfort_temp }}°C
+          
+          - if:
+              - condition: template
+                value_template: "{{ notification_enabled }}"
+            then:
+              - service: !input notification_service
+                data:
+                  message: >
+                    🔥 TUTTE LE ZONE ATTIVE - SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W
+
+      # ========================================================================
+      # 4. ATTIVAZIONE - Livello MEDIO (70% < Batt < 90% O Surplus 2000-4000W)
+      # ========================================================================
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: and
+                conditions:
+                  - condition: numeric_state
+                    entity_id: !input battery_sensor
+                    above: !input battery_medium_threshold
+                    below: !input battery_high_threshold
+              - condition: template
+                value_template: "{{ surplus_power >= surplus_medium and surplus_power <= surplus_high }}"
+          - condition: numeric_state
+            entity_id: !input outdoor_temp_sensor
+            below: !input outdoor_temp_low
+        sequence:
+          # Zona Giorno (senza studio)
+          - service: climate.set_hvac_mode
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+            data:
+              hvac_mode: heat
+          
+          - service: climate.set_temperature
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+            data:
+              temperature: "{{ comfort_temp }}"
+          
+          # Zona Notte
+          - service: climate.set_hvac_mode
+            target:
+              entity_id:
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+            data:
+              hvac_mode: heat
+          
+          - service: climate.set_temperature
+            target:
+              entity_id:
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+            data:
+              temperature: "{{ eco_temp }}"
+          
+          # Camera FG condizionata alla presenza
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input guest_presence_switch
+                    state: "on"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target:
+                      entity_id: !input climate_camera_fg
+                    data:
+                      hvac_mode: heat
+                  - service: climate.set_temperature
+                    target:
+                      entity_id: !input climate_camera_fg
+                    data:
+                      temperature: "{{ guest_temp }}"
+            default:
+              - service: climate.turn_off
+                target:
+                  entity_id: !input climate_camera_fg
+          
+          # Spegnimento Studio e B&B
+          - service: climate.turn_off
+            target:
+              entity_id:
+                - !input climate_studio
+                - !input climate_bnb
+          
+          # Notifiche
+          - if:
+              - condition: template
+                value_template: "{{ text_entity_enabled }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input notification_text_entity
+                data:
+                  value: >
+                    ⚡ ZONE PRIORITARIE + CAMERA FG - {{ now().strftime('%d/%m %H:%M') }} 
+                    SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W 
+                    Zone giorno: {{ comfort_temp }}°C | Zone notte: {{ eco_temp }}°C 
+                    Camera FG: {{ guest_temp }}°C | B&B/Studio: SPENTI
+          
+          - if:
+              - condition: template
+                value_template: "{{ notification_enabled }}"
+            then:
+              - service: !input notification_service
+                data:
+                  message: >
+                    ⚡ ZONE PRIORITARIE + CAMERA FG - SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W
+
+      # ========================================================================
+      # 5. ATTIVAZIONE - Livello BASE (50% < Batt < 70%)
+      # ========================================================================
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input battery_sensor
+            above: !input battery_low_threshold
+            below: !input battery_medium_threshold
+          - condition: template
+            value_template: "{{ surplus_power < surplus_medium }}"
+          - condition: numeric_state
+            entity_id: !input outdoor_temp_sensor
+            below: !input outdoor_temp_low
+        sequence:
+          # Zona Giorno
+          - service: climate.set_hvac_mode
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+            data:
+              hvac_mode: heat
+          
+          - service: climate.set_temperature
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+            data:
+              temperature: "{{ comfort_temp }}"
+          
+          # Zona Notte
+          - service: climate.set_hvac_mode
+            target:
+              entity_id:
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+            data:
+              hvac_mode: heat
+          
+          - service: climate.set_temperature
+            target:
+              entity_id:
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+            data:
+              temperature: "{{ eco_temp }}"
+          
+          # Spegnimento totale zone secondarie
+          - service: climate.turn_off
+            target:
+              entity_id:
+                - !input climate_studio
+                - !input climate_camera_fg
+                - !input climate_bnb
+          
+          # Notifiche
+          - if:
+              - condition: template
+                value_template: "{{ text_entity_enabled }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input notification_text_entity
+                data:
+                  value: >
+                    🟡 SOLO ZONE PRIORITARIE BASE - {{ now().strftime('%d/%m %H:%M') }} 
+                    SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W
+                    Zone: Cucina/Sala/Soggiorno/Matrimoniale/Demetrio | Altri: SPENTI
+          
+          - if:
+              - condition: template
+                value_template: "{{ notification_enabled }}"
+            then:
+              - service: !input notification_service
+                data:
+                  message: >
+                    🟡 SOLO ZONE PRIORITARIE BASE - SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W
+
+      # ========================================================================
+      # 6. SPEGNIMENTO - Batteria Sotto 50%
+      # ========================================================================
+      - conditions:
+          - condition: trigger
+            id: battery_low
+        sequence:
+          - service: climate.turn_off
+            target:
+              entity_id:
+                - !input climate_cucina
+                - !input climate_sala
+                - !input climate_soggiorno
+                - !input climate_studio
+                - !input climate_matrimoniale
+                - !input climate_demetrio
+                - !input climate_camera_fg
+                - !input climate_bnb
+          
+          - if:
+              - condition: template
+                value_template: "{{ text_entity_enabled }}"
+            then:
+              - service: input_text.set_value
+                target:
+                  entity_id: !input notification_text_entity
+                data:
+                  value: >
+                    🔄 CAMBIO CONTROLLO - SOC < {{ battery_low }}% - {{ now().strftime('%d/%m %H:%M') }} 
+                    SOC: {{ battery_level }}% - Controllo trasferito ad automazione RETE
+          
+          - if:
+              - condition: template
+                value_template: "{{ notification_enabled }}"
+            then:
+              - service: !input notification_service
+                data:
+                  message: >
+                    🔄 SOC < {{ battery_low }}% - Controllo trasferito ad automazione RETE
+
+    # DEFAULT: Nessuna condizione soddisfatta
+    default:
+      - service: climate.turn_off
+        target:
+          entity_id:
+            - !input climate_cucina
+            - !input climate_sala
+            - !input climate_soggiorno
+            - !input climate_studio
+            - !input climate_matrimoniale
+            - !input climate_demetrio
+            - !input climate_camera_fg
+            - !input climate_bnb
+      
+      - if:
+          - condition: template
+            value_template: "{{ text_entity_enabled }}"
+        then:
+          - service: input_text.set_value
+            target:
+              entity_id: !input notification_text_entity
+            data:
+              value: >
+                🔴 NESSUNA CONDIZIONE ATTIVATA / TUTTO SPENTO - SOC: {{ battery_level }}% | Surplus: {{ surplus_power | round(0) }}W
+
+mode: single
