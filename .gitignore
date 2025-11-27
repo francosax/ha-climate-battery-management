@@ -1,3 +1,10 @@
+# Home Assistant
+*.log
+*.db
+*.db-shm
+*.db-wal
+home-assistant.log
+home-assistant_v2.db
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
